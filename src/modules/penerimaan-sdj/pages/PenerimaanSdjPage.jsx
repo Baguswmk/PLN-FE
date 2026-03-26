@@ -1,5 +1,9 @@
 import React, {useEffect, useState, useMemo} from "react";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { saveAs } from "file-saver";
+import ExcelJS from "exceljs";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import {
   Card,
   CardContent,
@@ -24,6 +28,8 @@ import {
   Search,
   Filter,
   RefreshCw,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import {
   Select,
@@ -65,9 +71,11 @@ import {
 } from "@/shared/components/ui/table";
 import Pagination from "@/shared/components/navigation/Pagination";
 import QrScannerModal from "@/shared/components/dialogs/QrScannerModal";
+import ManualInputDialog from "@/shared/components/dialogs/ManualInputDialog";
 import { useSdjStore } from "../store/useSdjStore";
 import PermissionGuard from "@/shared/components/guard/PermissionGuard";
 import { PERMISSIONS } from "@/config/permissions";
+import { sdjService } from "../services/sdjService";
 
 export default function PenerimaanSdjPage() {
   const {
@@ -102,6 +110,8 @@ export default function PenerimaanSdjPage() {
 
   const chartView = analyticsView || "daily";
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [finishModalOpen, setFinishModalOpen] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -272,6 +282,124 @@ export default function PenerimaanSdjPage() {
     toast.success("Data berhasil diperbarui!");
   };
 
+  const handleExportExcel = async () => {
+    toast.loading("Menyiapkan file Excel...", { id: "export-excel" });
+    try {
+      const state = useSdjStore.getState();
+      const params = {
+        startDate: state.dateRange?.from,
+        endDate: state.dateRange?.to,
+        shift: state.shift,
+        search: state.searchQuery,
+        limit: "All"
+      };
+      
+      const response = await sdjService.getAllData(params);
+      const dataToExport = response.data || [];
+
+      if (dataToExport.length === 0) {
+        toast.error("Tidak ada data untuk diekspor", { id: "export-excel" });
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Penerimaan SDJ");
+
+      worksheet.columns = [
+        { header: "No.", key: "no", width: 5 },
+        { header: "No. DO", key: "no_do", width: 20 },
+        { header: "Tanggal", key: "date", width: 15 },
+        { header: "Waktu", key: "time", width: 15 },
+        { header: "Truk (Hull No)", key: "hull_no", width: 15 },
+        { header: "Lot", key: "lot", width: 15 },
+        { header: "Tipe", key: "coal_type", width: 15 },
+        { header: "Asal (Loading)", key: "loading", width: 25 },
+        { header: "Tujuan (Dumping)", key: "dumping", width: 25 },
+        { header: "Net Weight (Ton)", key: "net_weight", width: 15 },
+        { header: "Status", key: "status", width: 15 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+
+      dataToExport.forEach((item, index) => {
+        worksheet.addRow({
+          no: index + 1,
+          no_do: item.no_do || "-",
+          date: item.date_shift || item.date || "-",
+          time: item.time ? item.time.substring(0, 5) : "-",
+          hull_no: item.hull_no || "-",
+          lot: item.lot || "-",
+          coal_type: item.coal_type || "-",
+          loading: item.loading || "-",
+          dumping: item.dumping || "-",
+          net_weight: item.net_weight || 0,
+          status: item.finish?.status || "IN_TRANSIT",
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      saveAs(blob, `Penerimaan_SDJ_${new Date().getTime()}.xlsx`);
+      toast.success("Berhasil ekspor ke Excel", { id: "export-excel" });
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengekspor data", { id: "export-excel" });
+    }
+  };
+
+  const handleExportPdf = async () => {
+    toast.loading("Menyiapkan file PDF...", { id: "export-pdf" });
+    try {
+      const state = useSdjStore.getState();
+      const params = {
+        startDate: state.dateRange?.from,
+        endDate: state.dateRange?.to,
+        shift: state.shift,
+        search: state.searchQuery,
+        limit: "All"
+      };
+      
+      const response = await sdjService.getAllData(params);
+      const dataToExport = response.data || [];
+
+      if (dataToExport.length === 0) {
+        toast.error("Tidak ada data untuk diekspor", { id: "export-pdf" });
+        return;
+      }
+
+      const doc = new jsPDF("landscape");
+      doc.text("Data Penerimaan SDJ", 14, 15);
+      
+      const head = [["No.", "No. DO", "Tanggal", "Waktu", "Truk", "Lot", "Loading", "Dumping", "Tonase", "Status"]];
+      const body = dataToExport.map((item, index) => [
+        index + 1,
+        item.no_do || "-",
+        item.date_shift || item.date || "-",
+        item.time ? item.time.substring(0, 5) : "-",
+        item.hull_no || "-",
+        item.lot || "-",
+        item.loading || "-",
+        item.dumping || "-",
+        item.net_weight || 0,
+        item.finish?.status || "IN_TRANSIT"
+      ]);
+
+      doc.autoTable({
+        head: head,
+        body: body,
+        startY: 20,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] }
+      });
+
+      doc.save(`Penerimaan_SDJ_${new Date().getTime()}.pdf`);
+      toast.success("Berhasil ekspor ke PDF", { id: "export-pdf" });
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengekspor data", { id: "export-pdf" });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -294,9 +422,7 @@ export default function PenerimaanSdjPage() {
           <PermissionGuard permission={PERMISSIONS.CREATE_SDJ}>
             <Button
               className="gap-2 shrink-0"
-              onClick={() =>
-                toast.info("Fitur Formulir Penerimaan Manual akan segera hadir")
-              }
+              onClick={() => setFinishModalOpen(true)}
             >
               <PictureInPicture className="w-4 h-4" />
               <span>Penerimaan Manual</span>
@@ -494,6 +620,14 @@ export default function PenerimaanSdjPage() {
                 />
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <Button variant="outline" className="gap-2 shrink-0" onClick={handleExportExcel}>
+                  <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                  <span className="hidden sm:inline">Excel</span>
+                </Button>
+                <Button variant="outline" className="gap-2 shrink-0" onClick={handleExportPdf}>
+                  <FileText className="w-4 h-4 text-red-600" />
+                  <span className="hidden sm:inline">PDF</span>
+                </Button>
                 <Button variant="outline" className="gap-2 shrink-0">
                   <Filter className="w-4 h-4" />
                   <span>Filter Lanjutan</span>
@@ -530,7 +664,7 @@ export default function PenerimaanSdjPage() {
                   <TableBody>
                     {paginatedData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="h-64 text-center">
+                        <TableCell colSpan={11} className="h-64 text-center">
                           <EmptyState
                             title="Data Penerimaan Kosong"
                             description="Belum ada catatan penerimaan SDJ atau tidak ada yang sesuai dengan pencarian."
@@ -666,6 +800,35 @@ export default function PenerimaanSdjPage() {
         onScan={handleScan}
         title="Scan Surat Jalan (SDJ)"
         description="Arahkan kamera ke QR Code pada dokumen Surat Jalan."
+      />
+
+      <ManualInputDialog
+        open={finishModalOpen}
+        onOpenChange={setFinishModalOpen}
+        title="Penerimaan Manual SDJ"
+        description="Ketik atau paste No. DO dari surat jalan untuk mengkonfirmasi penerimaan."
+        placeholder="Contoh: 02166C0326W3572F196   A1500A"
+        submitLabel="Konfirmasi Penerimaan"
+        isLoading={isFinishing}
+        onSubmit={async (value) => {
+          setIsFinishing(true);
+          try {
+            const res = await useSdjStore.getState().updateItemByNoDo(value, {
+              status: "FINISH",
+              edit_reason: "Input manual penerimaan SDJ",
+            });
+            if (res?.success) {
+              toast.success("Penerimaan SDJ berhasil dicatat!");
+              setFinishModalOpen(false);
+            } else {
+              toast.error(`Gagal memperbarui: ${res?.error || ""}`);
+            }
+          } catch {
+            toast.error("Terjadi kesalahan sistem.");
+          } finally {
+            setIsFinishing(false);
+          }
+        }}
       />
 
       {/* --- MODALS --- */}

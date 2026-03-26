@@ -1,5 +1,9 @@
-import React, {useEffect, useState, useMemo} from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { saveAs } from "file-saver";
+import ExcelJS from "exceljs";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import {
   Card,
   CardContent,
@@ -24,6 +28,8 @@ import {
   RefreshCw,
   Search,
   Filter,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import {
   Select,
@@ -56,6 +62,7 @@ import AnalyticsDashboard from "@/shared/components/data-display/AnalyticsDashbo
 import { DateRangePicker } from "@/shared/components/form/DateRangePicker";
 import EmptyState from "@/shared/components/data-display/EmptyState";
 import QrScannerModal from "@/shared/components/dialogs/QrScannerModal";
+import ManualInputDialog from "@/shared/components/dialogs/ManualInputDialog";
 import { useRomStore } from "../store/useRomStore";
 import PermissionGuard from "@/shared/components/guard/PermissionGuard";
 import { PERMISSIONS } from "@/config/permissions";
@@ -68,6 +75,7 @@ import {
   TableRow,
 } from "@/shared/components/ui/table";
 import Pagination from "@/shared/components/navigation/Pagination";
+import { romService } from "../services/romService";
 
 export default function PengeluaranRomPage() {
   const {
@@ -101,6 +109,8 @@ export default function PengeluaranRomPage() {
   }, []);
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const chartView = analyticsView || "daily";
 
   // Modal states
@@ -266,6 +276,124 @@ export default function PengeluaranRomPage() {
     toast.success("Data berhasil diperbarui!");
   };
 
+  const handleExportExcel = async () => {
+    toast.loading("Menyiapkan file Excel...", { id: "export-excel" });
+    try {
+      const state = useRomStore.getState();
+      const params = {
+        startDate: state.dateRange?.from,
+        endDate: state.dateRange?.to,
+        shift: state.shift,
+        search: state.searchQuery,
+        limit: "All"
+      };
+      
+      const response = await romService.getAllData(params);
+      const dataToExport = response.data || [];
+
+      if (dataToExport.length === 0) {
+        toast.error("Tidak ada data untuk diekspor", { id: "export-excel" });
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Pengeluaran ROM");
+
+      worksheet.columns = [
+        { header: "No.", key: "no", width: 5 },
+        { header: "No. DO", key: "no_do", width: 20 },
+        { header: "Tanggal", key: "date", width: 15 },
+        { header: "Waktu", key: "time", width: 15 },
+        { header: "Truk (Hull No)", key: "hull_no", width: 15 },
+        { header: "Lot", key: "lot", width: 15 },
+        { header: "Tipe", key: "coal_type", width: 15 },
+        { header: "Asal (Loading)", key: "loading", width: 25 },
+        { header: "Tujuan (Dumping)", key: "dumping", width: 25 },
+        { header: "Net Weight (Ton)", key: "net_weight", width: 15 },
+        { header: "Status", key: "status", width: 15 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+
+      dataToExport.forEach((item, index) => {
+        worksheet.addRow({
+          no: index + 1,
+          no_do: item.no_do || "-",
+          date: item.date_shift || item.date || "-",
+          time: item.time ? item.time.substring(0, 5) : "-",
+          hull_no: item.hull_no || "-",
+          lot: item.lot || "-",
+          coal_type: item.coal_type || "-",
+          loading: item.loading || "-",
+          dumping: item.dumping || "-",
+          net_weight: item.net_weight || 0,
+          status: item.finish?.status || "IN_TRANSIT",
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      saveAs(blob, `Pengeluaran_ROM_${new Date().getTime()}.xlsx`);
+      toast.success("Berhasil ekspor ke Excel", { id: "export-excel" });
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengekspor data", { id: "export-excel" });
+    }
+  };
+
+  const handleExportPdf = async () => {
+    toast.loading("Menyiapkan file PDF...", { id: "export-pdf" });
+    try {
+      const state = useRomStore.getState();
+      const params = {
+        startDate: state.dateRange?.from,
+        endDate: state.dateRange?.to,
+        shift: state.shift,
+        search: state.searchQuery,
+        limit: "All"
+      };
+      
+      const response = await romService.getAllData(params);
+      const dataToExport = response.data || [];
+
+      if (dataToExport.length === 0) {
+        toast.error("Tidak ada data untuk diekspor", { id: "export-pdf" });
+        return;
+      }
+
+      const doc = new jsPDF("landscape");
+      doc.text("Data Pengeluaran ROM", 14, 15);
+      
+      const head = [["No.", "No. DO", "Tanggal", "Waktu", "Truk", "Lot", "Loading", "Dumping", "Tonase", "Status"]];
+      const body = dataToExport.map((item, index) => [
+        index + 1,
+        item.no_do || "-",
+        item.date_shift || item.date || "-",
+        item.time ? item.time.substring(0, 5) : "-",
+        item.hull_no || "-",
+        item.lot || "-",
+        item.loading || "-",
+        item.dumping || "-",
+        item.net_weight || 0,
+        item.finish?.status || "IN_TRANSIT"
+      ]);
+
+      doc.autoTable({
+        head: head,
+        body: body,
+        startY: 20,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] }
+      });
+
+      doc.save(`Pengeluaran_ROM_${new Date().getTime()}.pdf`);
+      toast.success("Berhasil ekspor ke PDF", { id: "export-pdf" });
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengekspor data", { id: "export-pdf" });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -287,9 +415,7 @@ export default function PengeluaranRomPage() {
           <PermissionGuard permission={PERMISSIONS.CREATE_ROM}>
             <Button
               className="shrink-0 gap-2"
-              onClick={() =>
-                toast.info("Fitur Tambah Pengeluaran akan segera hadir")
-              }
+              onClick={() => setCreateModalOpen(true)}
             >
               <Truck className="w-4 h-4" />
               <span>Tambah Pengeluaran</span>
@@ -487,6 +613,14 @@ export default function PengeluaranRomPage() {
                 />
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <Button variant="outline" className="gap-2 shrink-0" onClick={handleExportExcel}>
+                  <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                  <span className="hidden sm:inline">Excel</span>
+                </Button>
+                <Button variant="outline" className="gap-2 shrink-0" onClick={handleExportPdf}>
+                  <FileText className="w-4 h-4 text-red-600" />
+                  <span className="hidden sm:inline">PDF</span>
+                </Button>
                 <Button variant="outline" className="gap-2 shrink-0">
                   <Filter className="w-4 h-4" />
                   <span>Filter Lanjutan</span>
@@ -519,7 +653,7 @@ export default function PengeluaranRomPage() {
                   <TableBody>
                     {paginatedData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="h-64 text-center">
+                        <TableCell colSpan={11} className="h-64 text-center">
                           <EmptyState
                             title="Data Pengiriman Kosong"
                             description="Belum ada catatan pengeluaran ROM atau tidak ada yang cocok dengan kriteria pencarian Anda."
@@ -663,6 +797,27 @@ export default function PengeluaranRomPage() {
         onScan={handleScan}
         title="Scan Barcode Truk / Alat"
         description="Arahkan kamera ke QR Code pada unit armada."
+      />
+
+      <ManualInputDialog
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        title="Tambah Pengeluaran ROM"
+        description="Ketik atau paste kode barcode dari surat jalan untuk mencatat pengeluaran baru."
+        placeholder="Contoh: 02166C0326W3572F196   A1500A"
+        submitLabel="Catat Pengeluaran"
+        isLoading={isCreating}
+        onSubmit={async (value) => {
+          setIsCreating(true);
+          const res = await useRomStore.getState().createItem({ no_do: value });
+          setIsCreating(false);
+          if (res?.success) {
+            toast.success("Berhasil mencatat Pengeluaran ROM!");
+            setCreateModalOpen(false);
+          } else {
+            toast.error(`Gagal mencatat data: ${res?.error || ""}`);
+          }
+        }}
       />
 
       {/* --- MODALS --- */}
