@@ -72,6 +72,7 @@ import {
 import QrScannerModal from "@/shared/components/dialogs/QrScannerModal";
 import ManualInputDialog from "@/shared/components/dialogs/ManualInputDialog";
 import ArriveShipmentDialog from "../components/ArriveShipmentDialog";
+import ShipmentDetailDialog from "@/shared/components/dialogs/ShipmentDetailDialog";
 import AdvancedFilterPopover from "@/shared/components/filters/AdvancedFilterPopover";
 import { useSdjStore } from "../store/useSdjStore";
 import PermissionGuard from "@/shared/components/guard/PermissionGuard";
@@ -910,52 +911,17 @@ export default function PenerimaanSdjPage() {
       />
 
       {/* --- MODALS --- */}
-      {/* View Detail Modal */}
-      <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Detail Penerimaan SDJ</DialogTitle>
-            <DialogDescription>
-              Informasi lengkap untuk dokumen SDJ {selectedItem?.id}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 text-sm mt-4">
-            <div className="grid grid-cols-2 gap-2">
-              <span className="text-muted-foreground">ID DB:</span>
-              <span className="font-medium">{selectedItem?.id}</span>
-              <span className="text-muted-foreground">No. DO:</span>
-              <span className="font-medium">{selectedItem?.no_do || "-"}</span>
-              <span className="text-muted-foreground">Tanggal Shift:</span>
-              <span className="font-medium">
-                {selectedItem?.date_shift || selectedItem?.date || "-"}
-              </span>
-              <span className="text-muted-foreground">Waktu:</span>
-              <span className="font-medium">{selectedItem?.time || "-"}</span>
-              <span className="text-muted-foreground">Tipe Batubara:</span>
-              <span className="font-medium">{selectedItem?.coal_type || "-"}</span>
-              <span className="text-muted-foreground">Truk (Hull No):</span>
-              <span className="font-medium">{selectedItem?.hull_no || "-"}</span>
-              <span className="text-muted-foreground">Supir:</span>
-              <span className="font-medium">{selectedItem?.username || "-"}</span>
-              <span className="text-muted-foreground">Lokasi Loading:</span>
-              <span className="font-medium">{selectedItem?.loading || "-"}</span>
-              <span className="text-muted-foreground">Lokasi Dumping:</span>
-              <span className="font-medium">{selectedItem?.dumping || "-"}</span>
-              <span className="text-muted-foreground">Lot:</span>
-              <span className="font-medium">{selectedItem?.lot || "-"}</span>
-              <span className="text-muted-foreground">Net Weight (Ton):</span>
-              <span className="font-medium">{selectedItem?.net_weight || 0}</span>
-              <span className="text-muted-foreground">Status:</span>
-              <span className="font-medium">
-                {selectedItem?.finish?.status || "IN_TRANSIT"}
-              </span>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setViewModalOpen(false)}>Tutup</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* View Detail Modal diganti dengan ShipmentDetailDialog */}
+      <ShipmentDetailDialog
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+        item={selectedItem}
+        mode="sdj"
+        onPhotoUpdated={() => {
+          // Refresh overview setelah foto diganti
+          useSdjStore.getState().fetchOverview();
+        }}
+      />
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
@@ -982,6 +948,24 @@ export default function PenerimaanSdjPage() {
                 value={editFields.hull_no || ""}
                 onChange={(e) =>
                   setEditFields((f) => ({ ...f, hull_no: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">No. Segel (Seal No)</label>
+              <Input
+                value={editFields.seal_no || ""}
+                onChange={(e) =>
+                  setEditFields((f) => ({ ...f, seal_no: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipe Batubara</label>
+              <Input
+                value={editFields.coal_type || ""}
+                onChange={(e) =>
+                  setEditFields((f) => ({ ...f, coal_type: e.target.value }))
                 }
               />
             </div>

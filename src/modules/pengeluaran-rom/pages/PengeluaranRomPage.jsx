@@ -66,6 +66,7 @@ import QrScannerModal from "@/shared/components/dialogs/QrScannerModal";
 import ManualInputDialog from "@/shared/components/dialogs/ManualInputDialog";
 import RegisterShipmentDialog from "../components/RegisterShipmentDialog";
 import MatchSjbDialog from "../components/MatchSjbDialog";
+import ShipmentDetailDialog from "@/shared/components/dialogs/ShipmentDetailDialog";
 import { useRomStore } from "../store/useRomStore";
 import PermissionGuard from "@/shared/components/guard/PermissionGuard";
 import { PERMISSIONS } from "@/config/permissions";
@@ -103,8 +104,6 @@ export default function PengeluaranRomPage() {
     setCurrentPage,
     setItemsPerPage,
     setSearchQuery,
-    statusFilter,
-    setStatusFilter,
     fetchAnalytics,
     applyFilters,
     deleteItem,
@@ -129,7 +128,6 @@ export default function PengeluaranRomPage() {
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-
   // Edit form state
   const [editFields, setEditFields] = useState({});
   const [editReason, setEditReason] = useState("");
@@ -776,6 +774,21 @@ export default function PengeluaranRomPage() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-2">
+                               {item.finish?.status === "REGISTERED" && (
+                                <PermissionGuard permission={PERMISSIONS.CREATE_ROM}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setMatchSjbModalOpen(true);
+                                    }}
+                                    className="h-8 gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:text-gray-900"
+                                  >
+                                    <LinkIcon className="h-3 w-3" />
+                                    Match SJB
+                                  </Button>
+                                </PermissionGuard>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -785,21 +798,7 @@ export default function PengeluaranRomPage() {
                                 <Eye className="h-4 w-4" />
                               </Button>
                               {/* Tombol Match SJB per-baris untuk REGISTERED */}
-                              {item.finish?.status === "REGISTERED" && (
-                                <PermissionGuard permission={PERMISSIONS.CREATE_ROM}>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setMatchSjbModalOpen(true);
-                                    }}
-                                    className="h-8 gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                                  >
-                                    <LinkIcon className="h-3 w-3" />
-                                    Match SJB
-                                  </Button>
-                                </PermissionGuard>
-                              )}
+                             
                               <PermissionGuard
                                 permission={PERMISSIONS.EDIT_ROM}
                               >
@@ -942,66 +941,17 @@ export default function PengeluaranRomPage() {
       />
 
       {/* --- MODALS --- */}
-      {/* View Detail Modal */}
-      <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Detail Pengiriman ROM</DialogTitle>
-            <DialogDescription>
-              Informasi lengkap untuk ID {selectedItem?.id}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 text-sm mt-4">
-            <div className="grid grid-cols-2 gap-2">
-              <span className="text-muted-foreground">ID DB:</span>
-              <span className="font-medium">{selectedItem?.id}</span>
-              <span className="text-muted-foreground">No. DO:</span>
-              <span className="font-medium">{selectedItem?.no_do || "-"}</span>
-              <span className="text-muted-foreground">Tanggal Shift:</span>
-              <span className="font-medium">
-                {selectedItem?.date_shift || selectedItem?.date || "-"}
-              </span>
-              <span className="text-muted-foreground">Waktu:</span>
-              <span className="font-medium">{selectedItem?.time || "-"}</span>
-              <span className="text-muted-foreground">Tipe Batubara:</span>
-              <span className="font-medium">
-                {selectedItem?.coal_type || "-"}
-              </span>
-              <span className="text-muted-foreground">Truk (Hull No):</span>
-              <span className="font-medium">
-                {selectedItem?.hull_no || "-"}
-              </span>
-              <span className="text-muted-foreground">Supir:</span>
-              <span className="font-medium">
-                {selectedItem?.username || "-"}
-              </span>
-              <span className="text-muted-foreground">Lokasi Loading:</span>
-              <span className="font-medium">
-                {selectedItem?.loading || "-"}
-              </span>
-              <span className="text-muted-foreground">Lokasi Dumping:</span>
-              <span className="font-medium">
-                {selectedItem?.dumping || "-"}
-              </span>
-              <span className="text-muted-foreground">Lot:</span>
-              <span className="font-medium">{selectedItem?.lot || "-"}</span>
-              <span className="text-muted-foreground">
-                Status Penerimaan (SDJ):
-              </span>
-              <span className="font-medium">
-                {selectedItem?.finish?.status || "IN_TRANSIT"}
-              </span>
-              <span className="text-muted-foreground">Net Weight (MT):</span>
-              <span className="font-medium">
-                {selectedItem?.net_weight || 0}
-              </span>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setViewModalOpen(false)}>Tutup</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* View Detail Modal diganti dengan ShipmentDetailDialog */}
+      <ShipmentDetailDialog
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
+        item={selectedItem}
+        mode="rom"
+        onPhotoUpdated={() => {
+          // Refresh overview setelah foto diganti
+          useRomStore.getState().fetchOverview();
+        }}
+      />
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
@@ -1028,6 +978,24 @@ export default function PengeluaranRomPage() {
                 value={editFields.hull_no || ""}
                 onChange={(e) =>
                   setEditFields((f) => ({ ...f, hull_no: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">No. Segel (Seal No)</label>
+              <Input
+                value={editFields.seal_no || ""}
+                onChange={(e) =>
+                  setEditFields((f) => ({ ...f, seal_no: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipe Batubara</label>
+              <Input
+                value={editFields.coal_type || ""}
+                onChange={(e) =>
+                  setEditFields((f) => ({ ...f, coal_type: e.target.value }))
                 }
               />
             </div>

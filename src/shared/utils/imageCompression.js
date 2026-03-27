@@ -18,9 +18,11 @@ export async function compressImage(file, options = {}) {
 
   try {
     const compressed = await imageCompression(file, defaultOptions);
-    return compressed;
+    // Rename file extension ke .webp agar tidak bingung Sharp di backend (Windows EBUSY fix)
+    const newName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
+    return new File([compressed], newName, { type: "image/webp" });
   } catch (error) {
     console.error('Image compression failed, using original:', error);
-    return file; // Fallback ke file asli jika gagal compress
+    return file; 
   }
 }

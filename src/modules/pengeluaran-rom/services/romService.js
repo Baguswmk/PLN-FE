@@ -67,34 +67,25 @@ export const romService = {
   },
 
   /**
-   * 2. API Khusus Semua Data (List tabel lengkap, tanpa limit 10)
+   * 2. API Khusus Semua Data (List tabel lengkap)
+   *    Menggunakan custom endpoint yang mengembalikan data flat + ternormalisasi
+   *    → tidak perlu populate params panjang, response lebih ringan
    */
   async getAllData(params = {}, signal = null) {
-    const strapiParams = {
-      "populate[finish][populate]": "*",
-      "populate[user][fields][0]": "username",
-      "pagination[page]": params.page || 1,
-      "pagination[pageSize]": params.limit === "All" ? 1000 : (params.limit || 100), // Default 100 per page instead of 10
-      "sort": "createdAt:desc",
+    const query = {
+      page:      params.page      || 1,
+      limit:     params.limit     || 100,
     };
+    if (params.startDate)                         query.startDate = params.startDate;
+    if (params.endDate)                           query.endDate   = params.endDate;
+    if (params.shift && params.shift !== 'all')   query.shift     = params.shift;
+    if (params.search)                            query.search    = params.search;
 
-    if (params.startDate) strapiParams["filters[date_shift][$gte]"] = params.startDate;
-    if (params.endDate) strapiParams["filters[date_shift][$lte]"] = params.endDate;
-    if (params.shift && params.shift !== "all") strapiParams["filters[shift][$eq]"] = parseInt(params.shift, 10);
-    if (params.finishStatus && params.finishStatus !== "all") {
-      strapiParams["filters[finish][status][$eq]"] = params.finishStatus;
-    }
-    if (params.search) {
-      strapiParams["filters[$or][0][no_do][$containsi]"] = params.search;
-      strapiParams["filters[$or][1][hull_no][$containsi]"] = params.search;
-      strapiParams["filters[$or][2][lot][$containsi]"] = params.search;
-    }
-
-    const response = await httpClient.get("/shipments", { params: strapiParams, signal });
+    const response = await httpClient.get('/shipments/all-rom', { params: query, signal });
     return {
       success: true,
-      data: (response.data?.data || []).map(normalizeItem),
-      total: response.data?.meta?.pagination?.total || 0,
+      data:  response.data?.data  || [],
+      total: response.data?.total || 0,
     };
   },
 
