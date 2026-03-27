@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import Header from "./Header.jsx";
 import OfflineSyncIndicator from "@/shared/components/offline/OfflineSyncIndicator";
+import OfflineBanner from "@/shared/components/offline/OfflineBanner";
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -29,6 +30,7 @@ export default function AppLayout() {
       {/* Main Content Area */}
       <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
         <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        {/* <OfflineBanner /> */}
 
         <main className="flex-1 p-4 md:p-6 lg:p-8 ">
           <Outlet />

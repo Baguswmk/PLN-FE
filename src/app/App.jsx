@@ -5,6 +5,7 @@ import AppRouter from "@/routes/AppRouter.jsx";
 import { UpdateNotification } from "@/core/pwa/UpdateNotification.jsx";
 import { ThemeProvider } from "@/shared/components/ui/theme-provider.jsx";
 import { Toaster } from "sonner";
+import ErrorBoundary from "@/shared/components/ErrorBoundary.jsx";
 import "./App.css";
 
 export default function App() {
@@ -12,7 +13,9 @@ export default function App() {
     <ThemeProvider defaultTheme="system" storageKey="pln-ui-theme">
       <BrowserRouter>
         <AuthProvider>
-          <AppRouter />
+          <ErrorBoundary>
+            <AppRouter />
+          </ErrorBoundary>
           <UpdateNotification />
           <Toaster position="top-center" richColors />
         </AuthProvider>

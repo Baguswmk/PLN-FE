@@ -9,12 +9,19 @@ const httpClient = axios.create({
   },
 });
 
-// Request interceptor: attach Bearer token
+// Request interceptor: attach Bearer token + dynamic timeout
 httpClient.interceptors.request.use(
   (config) => {
     const token = getSecureItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Upload foto butuh waktu lebih lama di sinyal lemah lapangan
+    if (
+      config.headers["Content-Type"]?.includes("multipart/form-data") ||
+      config.data instanceof FormData
+    ) {
+      config.timeout = 90000; // 90 detik untuk upload file
     }
     return config;
   },

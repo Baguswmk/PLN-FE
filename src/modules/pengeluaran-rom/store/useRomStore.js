@@ -24,6 +24,7 @@ export const useRomStore = create((set, get) => ({
   currentPage: 1,
   itemsPerPage: 10,
   searchQuery: "",
+  statusFilter: "all",
   dateRange: { from: new Date(), to: new Date() },
   shift: "all",
 
@@ -34,6 +35,7 @@ export const useRomStore = create((set, get) => ({
   // Actions: filter state
   setDateRange: (range) => set({ dateRange: range }),
   setShift: (shift) => set({ shift }),
+  setStatusFilter: (statusFilter) => set({ statusFilter }),
   setAnalyticsView: (view) => set({ analyticsView: view }),
   setCurrentPage: (page) => {
     set({ currentPage: page });
@@ -203,11 +205,15 @@ export const useRomStore = create((set, get) => ({
 
   // Step 1: Register DT (hull_no + seal + foto)
   registerItem: async (payload) => {
+    // Foto tidak bisa di-queue offline (FormData tidak bisa di-serialize)
+    if (!navigator.onLine) {
+      return { success: false, error: "Tidak dapat register DT saat offline — diperlukan koneksi untuk upload foto segel." };
+    }
     try {
       const sanitized = {
         hull_no: DOMPurify.sanitize(payload.hull_no || ""),
         seal_no: DOMPurify.sanitize(payload.seal_no || ""),
-        foto_seal_start: payload.foto_seal_start, // File object, jangan sanitize
+        foto_seal_start: payload.foto_seal_start,
       };
       await romService.registerShipment(sanitized);
       set({ _lastFetched: { overview: null, data: null, analytics: null } });
@@ -220,6 +226,15 @@ export const useRomStore = create((set, get) => ({
 
   // Step 2: Match SJB (scan no_do → match ke DT terdaftar)
   matchSjbItem: async (no_do) => {
+    if (!navigator.onLine) {
+      useSyncStore.getState().addToQueue({
+        module: "ROM",
+        type: "MATCH_SJB",
+        payload: { no_do },
+        timestamp: Date.now(),
+      });
+      return { success: true, fakeOffline: true };
+    }
     try {
       const sanitized = DOMPurify.sanitize(no_do || "");
       const result = await romService.matchSjb(sanitized);

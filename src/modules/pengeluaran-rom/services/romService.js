@@ -81,6 +81,9 @@ export const romService = {
     if (params.startDate) strapiParams["filters[date_shift][$gte]"] = params.startDate;
     if (params.endDate) strapiParams["filters[date_shift][$lte]"] = params.endDate;
     if (params.shift && params.shift !== "all") strapiParams["filters[shift][$eq]"] = parseInt(params.shift, 10);
+    if (params.finishStatus && params.finishStatus !== "all") {
+      strapiParams["filters[finish][status][$eq]"] = params.finishStatus;
+    }
     if (params.search) {
       strapiParams["filters[$or][0][no_do][$containsi]"] = params.search;
       strapiParams["filters[$or][1][hull_no][$containsi]"] = params.search;

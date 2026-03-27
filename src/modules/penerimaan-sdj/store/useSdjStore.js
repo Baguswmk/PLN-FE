@@ -196,6 +196,10 @@ export const useSdjStore = create((set, get) => ({
 
   // Step 3: Arrive — DT sampai di lokasi tujuan
   arriveItem: async (shipmentId, payload) => {
+    // Foto tidak bisa di-queue offline (FormData tidak bisa di-serialize)
+    if (!navigator.onLine) {
+      return { success: false, error: "Tidak dapat submit kedatangan saat offline — diperlukan koneksi untuk upload foto segel akhir." };
+    }
     try {
       const sanitized = {
         seal_no: DOMPurify.sanitize(payload.seal_no || ""),

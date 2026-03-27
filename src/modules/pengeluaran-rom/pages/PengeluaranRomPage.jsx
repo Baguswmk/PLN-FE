@@ -30,6 +30,7 @@ import {
   Filter,
   FileSpreadsheet,
   FileText,
+  Link as LinkIcon,
 } from "lucide-react";
 import {
   Select,
@@ -77,6 +78,8 @@ import {
   TableRow,
 } from "@/shared/components/ui/table";
 import Pagination from "@/shared/components/navigation/Pagination";
+import AdvancedFilterPopover from "@/shared/components/filters/AdvancedFilterPopover";
+import { TableSkeleton } from "@/shared/components/ui/table-skeleton";
 import { romService } from "../services/romService";
 
 export default function PengeluaranRomPage() {
@@ -100,6 +103,8 @@ export default function PengeluaranRomPage() {
     setCurrentPage,
     setItemsPerPage,
     setSearchQuery,
+    statusFilter,
+    setStatusFilter,
     fetchAnalytics,
     applyFilters,
     deleteItem,
@@ -129,6 +134,12 @@ export default function PengeluaranRomPage() {
   const [editFields, setEditFields] = useState({});
   const [editReason, setEditReason] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
+  const [advancedFilters, setAdvancedFilters] = useState({
+    loading: "all",
+    dumping: "all",
+    lot: "all",
+    status: "all",
+  });
 
   const dashboardDateRange = useMemo(() => {
     if (!dateRange)
@@ -198,6 +209,24 @@ export default function PengeluaranRomPage() {
       ? totalItems
       : itemsPerPage;
   const totalPages = Math.max(1, Math.ceil(totalItems / numericItemsPerPage));
+
+  // Client-side filter by advanced filters only (instan, offline-friendly)
+  const filteredData = useMemo(() => {
+    let result = paginatedData;
+    if (advancedFilters.status && advancedFilters.status !== "all") {
+      result = result.filter((item) => item.finish?.status === advancedFilters.status);
+    }
+    if (advancedFilters.loading && advancedFilters.loading !== "all") {
+      result = result.filter((item) => item.loading === advancedFilters.loading);
+    }
+    if (advancedFilters.dumping && advancedFilters.dumping !== "all") {
+      result = result.filter((item) => item.dumping === advancedFilters.dumping);
+    }
+    if (advancedFilters.lot && advancedFilters.lot !== "all") {
+      result = result.filter((item) => item.lot === advancedFilters.lot);
+    }
+    return result;
+  }, [paginatedData, advancedFilters]);
 
   const handleDetail = (item) => {
     setSelectedItem(item);
@@ -594,8 +623,11 @@ export default function PengeluaranRomPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
+                  {isLoading ? (
+                    <TableSkeleton columnCount={3} rowCount={5} />
+                  ) : (
+                    <Table>
+                      <TableHeader>
                       <TableRow>
                         <TableHead>No. DO</TableHead>
                         <TableHead>Truk / Hull No</TableHead>
@@ -618,6 +650,7 @@ export default function PengeluaranRomPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -647,10 +680,12 @@ export default function PengeluaranRomPage() {
                   <FileText className="w-4 h-4 text-red-600" />
                   <span className="hidden sm:inline">PDF</span>
                 </Button>
-                <Button variant="outline" className="gap-2 shrink-0">
-                  <Filter className="w-4 h-4" />
-                  <span>Filter Lanjutan</span>
-                </Button>
+                <AdvancedFilterPopover
+                  data={paginatedData}
+                  filters={advancedFilters}
+                  onFiltersChange={setAdvancedFilters}
+                  showStatus={true}
+                />
                 <Button variant="outline" size="icon" onClick={handleRefresh}>
                   <RefreshCw className="w-4 h-4" />
                 </Button>
@@ -658,8 +693,13 @@ export default function PengeluaranRomPage() {
             </div>
             <Card>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
+                {isLoading ? (
+                  <div className="p-4">
+                    <TableSkeleton columnCount={11} rowCount={10} />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
                     <TableRow>
                       <TableHead className="w-[50px]">No.</TableHead>
                       <TableHead>No. DO</TableHead>
@@ -677,7 +717,7 @@ export default function PengeluaranRomPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedData.length === 0 ? (
+                    {filteredData.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={11} className="h-64 text-center">
                           <EmptyState
@@ -691,7 +731,7 @@ export default function PengeluaranRomPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      paginatedData.map((item, index) => (
+                      filteredData.map((item, index) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium text-muted-foreground">
                             {(currentPage - 1) * numericItemsPerPage +
@@ -744,6 +784,22 @@ export default function PengeluaranRomPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              {/* Tombol Match SJB per-baris untuk REGISTERED */}
+                              {item.finish?.status === "REGISTERED" && (
+                                <PermissionGuard permission={PERMISSIONS.CREATE_ROM}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setMatchSjbModalOpen(true);
+                                    }}
+                                    className="h-8 gap-1 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                  >
+                                    <LinkIcon className="h-3 w-3" />
+                                    Match SJB
+                                  </Button>
+                                </PermissionGuard>
+                              )}
                               <PermissionGuard
                                 permission={PERMISSIONS.EDIT_ROM}
                               >
@@ -775,6 +831,7 @@ export default function PengeluaranRomPage() {
                     )}
                   </TableBody>
                 </Table>
+                )}
               </CardContent>
             </Card>
 

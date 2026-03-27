@@ -72,11 +72,14 @@ import {
 import QrScannerModal from "@/shared/components/dialogs/QrScannerModal";
 import ManualInputDialog from "@/shared/components/dialogs/ManualInputDialog";
 import ArriveShipmentDialog from "../components/ArriveShipmentDialog";
+import AdvancedFilterPopover from "@/shared/components/filters/AdvancedFilterPopover";
 import { useSdjStore } from "../store/useSdjStore";
 import PermissionGuard from "@/shared/components/guard/PermissionGuard";
 import { PERMISSIONS } from "@/config/permissions";
 import { sdjService } from "../services/sdjService";
 import Pagination from "@/shared/components/navigation/Pagination";
+import { TableSkeleton } from "@/shared/components/ui/table-skeleton";
+
 export default function PenerimaanSdjPage() {
   const {
     data: paginatedData,
@@ -122,6 +125,12 @@ export default function PenerimaanSdjPage() {
   const [editFields, setEditFields] = useState({});
   const [editReason, setEditReason] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
+  const [advancedFilters, setAdvancedFilters] = useState({
+    loading: "all",
+    dumping: "all",
+    lot: "all",
+    status: "all",
+  });
 
   const dashboardDateRange = useMemo(() => {
     if (!dateRange)
@@ -197,6 +206,24 @@ export default function PenerimaanSdjPage() {
       ? totalItems
       : itemsPerPage;
   const totalPages = Math.max(1, Math.ceil(totalItems / numericItemsPerPage));
+
+  // Client-side advanced filtering (instan, offline-friendly)
+  const filteredData = useMemo(() => {
+    let result = paginatedData;
+    if (advancedFilters.status && advancedFilters.status !== "all") {
+      result = result.filter((item) => item.finish?.status === advancedFilters.status);
+    }
+    if (advancedFilters.loading && advancedFilters.loading !== "all") {
+      result = result.filter((item) => item.loading === advancedFilters.loading);
+    }
+    if (advancedFilters.dumping && advancedFilters.dumping !== "all") {
+      result = result.filter((item) => item.dumping === advancedFilters.dumping);
+    }
+    if (advancedFilters.lot && advancedFilters.lot !== "all") {
+      result = result.filter((item) => item.lot === advancedFilters.lot);
+    }
+    return result;
+  }, [paginatedData, advancedFilters]);
 
   const handleDetail = (item) => {
     setSelectedItem(item);
@@ -581,8 +608,11 @@ export default function PenerimaanSdjPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
+                  {isLoading ? (
+                    <TableSkeleton columnCount={3} rowCount={5} />
+                  ) : (
+                    <Table>
+                      <TableHeader>
                       <TableRow>
                         <TableHead>No. DO</TableHead>
                         <TableHead>Truk / Hull No</TableHead>
@@ -605,6 +635,7 @@ export default function PenerimaanSdjPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -634,10 +665,12 @@ export default function PenerimaanSdjPage() {
                   <FileText className="w-4 h-4 text-red-600" />
                   <span className="hidden sm:inline">PDF</span>
                 </Button>
-                <Button variant="outline" className="gap-2 shrink-0">
-                  <Filter className="w-4 h-4" />
-                  <span>Filter Lanjutan</span>
-                </Button>
+                <AdvancedFilterPopover
+                  data={paginatedData}
+                  filters={advancedFilters}
+                  onFiltersChange={setAdvancedFilters}
+                  showStatus={true}
+                />
                 <Button
                   variant="outline"
                   size="icon"
@@ -649,8 +682,13 @@ export default function PenerimaanSdjPage() {
             </div>
             <Card>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
+                {isLoading ? (
+                  <div className="p-4">
+                    <TableSkeleton columnCount={11} rowCount={10} />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
                     <TableRow>
                       <TableHead className="w-[50px]">No.</TableHead>
                       <TableHead>No. DO</TableHead>
@@ -668,7 +706,7 @@ export default function PenerimaanSdjPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedData.length === 0 ? (
+                    {filteredData.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={11} className="h-64 text-center">
                           <EmptyState
@@ -682,7 +720,7 @@ export default function PenerimaanSdjPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      paginatedData.map((item, index) => (
+                      filteredData.map((item, index) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium text-muted-foreground">
                             {(currentPage - 1) * numericItemsPerPage +
@@ -770,6 +808,7 @@ export default function PenerimaanSdjPage() {
                     )}
                   </TableBody>
                 </Table>
+                )}
               </CardContent>
             </Card>
 
