@@ -134,6 +134,37 @@ export const romService = {
   },
 
   /**
+   * Step 1: Register DT baru (hull_no + seal_no + foto segel)
+   * Mengirim sebagai multipart/form-data karena ada foto.
+   */
+  async registerShipment(payload) {
+    const formData = new FormData();
+    formData.append("data", JSON.stringify({
+      hull_no: payload.hull_no,
+      seal_no: payload.seal_no,
+    }));
+
+    if (payload.foto_seal_start) {
+      formData.append("files.foto_seal_start", payload.foto_seal_start);
+    }
+
+    const response = await httpClient.post("/shipments/register", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return { success: true, data: response.data.data };
+  },
+
+  /**
+   * Step 2: Match SJB — scan/input no_do, match ke DT yang sudah terdaftar.
+   */
+  async matchSjb(no_do) {
+    const response = await httpClient.post("/shipments/match-sjb", {
+      data: { no_do },
+    });
+    return { success: true, data: response.data.data };
+  },
+
+  /**
    * Update Data Shipment ROM. WAJIB menyertakan edit_reason.
    * @param {string|number} id
    * @param {object} edits - { ...fields, edit_reason: "..." }

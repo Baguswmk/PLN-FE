@@ -8,8 +8,13 @@ import { ROLE_PERMISSIONS, ROLES } from "@/config/permissions";
 export default function usePermissions() {
   const { role } = useAuthContext();
   
-  // Default fallback jika role tidak terbaca, treat as GUEST
-  const currentRole = role || ROLES.GUEST;
+  // Cari role yang cocok secara case-insensitive dari ROLES dictionary
+  const matchedRole = Object.values(ROLES).find(
+    (r) => typeof role === "string" && r.toLowerCase() === role.toLowerCase()
+  );
+
+  // Default fallback jika role tidak terbaca atau tidak cocok, treat as GUEST
+  const currentRole = matchedRole || ROLES.GUEST;
   
   // Ambil list permissions untuk role spesifik dari konfigurasi
   const userPermissions = ROLE_PERMISSIONS[currentRole] || [];

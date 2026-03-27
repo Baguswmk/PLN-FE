@@ -201,6 +201,36 @@ export const useRomStore = create((set, get) => ({
     }
   },
 
+  // Step 1: Register DT (hull_no + seal + foto)
+  registerItem: async (payload) => {
+    try {
+      const sanitized = {
+        hull_no: DOMPurify.sanitize(payload.hull_no || ""),
+        seal_no: DOMPurify.sanitize(payload.seal_no || ""),
+        foto_seal_start: payload.foto_seal_start, // File object, jangan sanitize
+      };
+      await romService.registerShipment(sanitized);
+      set({ _lastFetched: { overview: null, data: null, analytics: null } });
+      get().setActiveTab(get().activeTab);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  },
+
+  // Step 2: Match SJB (scan no_do → match ke DT terdaftar)
+  matchSjbItem: async (no_do) => {
+    try {
+      const sanitized = DOMPurify.sanitize(no_do || "");
+      const result = await romService.matchSjb(sanitized);
+      set({ _lastFetched: { overview: null, data: null, analytics: null } });
+      get().setActiveTab(get().activeTab);
+      return { success: true, data: result.data };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  },
+
   updateItem: async (id, payload) => {
     try {
       const sanitizedPayload = { ...payload };

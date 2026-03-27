@@ -63,6 +63,8 @@ import { DateRangePicker } from "@/shared/components/form/DateRangePicker";
 import EmptyState from "@/shared/components/data-display/EmptyState";
 import QrScannerModal from "@/shared/components/dialogs/QrScannerModal";
 import ManualInputDialog from "@/shared/components/dialogs/ManualInputDialog";
+import RegisterShipmentDialog from "../components/RegisterShipmentDialog";
+import MatchSjbDialog from "../components/MatchSjbDialog";
 import { useRomStore } from "../store/useRomStore";
 import PermissionGuard from "@/shared/components/guard/PermissionGuard";
 import { PERMISSIONS } from "@/config/permissions";
@@ -111,6 +113,10 @@ export default function PengeluaranRomPage() {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [matchSjbModalOpen, setMatchSjbModalOpen] = useState(false);
+  const [isMatchingSjb, setIsMatchingSjb] = useState(false);
   const chartView = analyticsView || "daily";
 
   // Modal states
@@ -403,22 +409,42 @@ export default function PengeluaranRomPage() {
             Pantau dan kelola pengiriman batubara.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <PermissionGuard permission={PERMISSIONS.CREATE_ROM}>
+            <Button
+              className="shrink-0 gap-2"
+              onClick={() => setRegisterModalOpen(true)}
+            >
+              <Truck className="w-4 h-4" />
+              <span>Register DT</span>
+            </Button>
+          </PermissionGuard>
+          <PermissionGuard permission={PERMISSIONS.CREATE_ROM}>
+            <Button
+              variant="outline"
+              className="shrink-0 gap-2"
+              onClick={() => setMatchSjbModalOpen(true)}
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Match SJB</span>
+            </Button>
+          </PermissionGuard>
           <Button
             variant="outline"
             className="shrink-0 gap-2"
             onClick={() => setIsScannerOpen(true)}
           >
             <QrCode className="w-4 h-4" />
-            <span>Scan Barcode</span>
+            <span>Scan Barcode (Lama)</span>
           </Button>
           <PermissionGuard permission={PERMISSIONS.CREATE_ROM}>
             <Button
+              variant="outline"
               className="shrink-0 gap-2"
               onClick={() => setCreateModalOpen(true)}
             >
               <Truck className="w-4 h-4" />
-              <span>Tambah Pengeluaran</span>
+              <span>Tambah Manual</span>
             </Button>
           </PermissionGuard>
         </div>
@@ -700,6 +726,8 @@ export default function PengeluaranRomPage() {
                               className={`px-2 py-1 rounded text-xs ${
                                 item.finish?.status === "FINISH"
                                   ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                                  : item.finish?.status === "REGISTERED"
+                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
                                   : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
                               }`}
                             >
@@ -802,7 +830,7 @@ export default function PengeluaranRomPage() {
       <ManualInputDialog
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
-        title="Tambah Pengeluaran ROM"
+        title="Tambah Pengeluaran ROM (Manual)"
         description="Ketik atau paste kode barcode dari surat jalan untuk mencatat pengeluaran baru."
         placeholder="Contoh: 02166C0326W3572F196   A1500A"
         submitLabel="Catat Pengeluaran"
@@ -816,6 +844,42 @@ export default function PengeluaranRomPage() {
             setCreateModalOpen(false);
           } else {
             toast.error(`Gagal mencatat data: ${res?.error || ""}`);
+          }
+        }}
+      />
+
+      {/* Step 1: Register DT */}
+      <RegisterShipmentDialog
+        open={registerModalOpen}
+        onOpenChange={setRegisterModalOpen}
+        isLoading={isRegistering}
+        onSubmit={async (payload) => {
+          setIsRegistering(true);
+          const res = await useRomStore.getState().registerItem(payload);
+          setIsRegistering(false);
+          if (res?.success) {
+            toast.success("DT berhasil didaftarkan!");
+            setRegisterModalOpen(false);
+          } else {
+            toast.error(`Gagal mendaftarkan DT: ${res?.error || ""}`);
+          }
+        }}
+      />
+
+      {/* Step 2: Match SJB */}
+      <MatchSjbDialog
+        open={matchSjbModalOpen}
+        onOpenChange={setMatchSjbModalOpen}
+        isLoading={isMatchingSjb}
+        onSubmit={async (noDo) => {
+          setIsMatchingSjb(true);
+          const res = await useRomStore.getState().matchSjbItem(noDo);
+          setIsMatchingSjb(false);
+          if (res?.success) {
+            toast.success("SJB berhasil di-match dengan DT!");
+            setMatchSjbModalOpen(false);
+          } else {
+            toast.error(`Gagal match SJB: ${res?.error || ""}`);
           }
         }}
       />

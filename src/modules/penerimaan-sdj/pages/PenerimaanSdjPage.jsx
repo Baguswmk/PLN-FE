@@ -69,14 +69,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
-import Pagination from "@/shared/components/navigation/Pagination";
 import QrScannerModal from "@/shared/components/dialogs/QrScannerModal";
 import ManualInputDialog from "@/shared/components/dialogs/ManualInputDialog";
+import ArriveShipmentDialog from "../components/ArriveShipmentDialog";
 import { useSdjStore } from "../store/useSdjStore";
 import PermissionGuard from "@/shared/components/guard/PermissionGuard";
 import { PERMISSIONS } from "@/config/permissions";
 import { sdjService } from "../services/sdjService";
-
+import Pagination from "@/shared/components/navigation/Pagination";
 export default function PenerimaanSdjPage() {
   const {
     data: paginatedData,
@@ -111,6 +111,7 @@ export default function PenerimaanSdjPage() {
   const chartView = analyticsView || "daily";
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [finishModalOpen, setFinishModalOpen] = useState(false);
+  const [arriveModalOpen, setArriveModalOpen] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -200,6 +201,11 @@ export default function PenerimaanSdjPage() {
   const handleDetail = (item) => {
     setSelectedItem(item);
     setViewModalOpen(true);
+  };
+
+  const handleArrive = (item) => {
+    setSelectedItem(item);
+    setArriveModalOpen(true);
   };
 
   // const formCreate = useForm({
@@ -711,6 +717,20 @@ export default function PenerimaanSdjPage() {
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-2">
+                              {/* Tombol Arrive (Konfirmasi Tiba) hanya untuk IN_TRANSIT */}
+                              {item.finish?.status === "IN_TRANSIT" && (
+                                <PermissionGuard permission={PERMISSIONS.CREATE_SDJ}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleArrive(item)}
+                                    className="h-8 gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                  >
+                                    <PictureInPicture className="h-3 w-3" />
+                                    Arrive
+                                  </Button>
+                                </PermissionGuard>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -827,6 +847,25 @@ export default function PenerimaanSdjPage() {
             toast.error("Terjadi kesalahan sistem.");
           } finally {
             setIsFinishing(false);
+          }
+        }}
+      />
+
+      <ArriveShipmentDialog
+        open={arriveModalOpen}
+        onOpenChange={setArriveModalOpen}
+        shipment={selectedItem}
+        isLoading={isFinishing}
+        onSubmit={async (payload) => {
+          if (!selectedItem) return;
+          setIsFinishing(true);
+          const res = await useSdjStore.getState().arriveItem(selectedItem.id, payload);
+          setIsFinishing(false);
+          if (res?.success) {
+            toast.success(`DT ${selectedItem.hull_no} berhasil dikonfirmasi tiba!`);
+            setArriveModalOpen(false);
+          } else {
+            toast.error(`Gagal konfirmasi: ${res?.error || ""}`);
           }
         }}
       />

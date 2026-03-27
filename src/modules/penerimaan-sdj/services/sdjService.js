@@ -135,6 +135,28 @@ export const sdjService = {
   },
 
   /**
+   * Step 3: Arrive — DT sampai di lokasi tujuan.
+   * Mengirim seal_no + foto segel sebagai multipart/form-data.
+   * @param {number} shipmentId - ID shipment
+   * @param {object} payload - { seal_no, foto_seal_finish (File) }
+   */
+  async arriveShipment(shipmentId, payload) {
+    const formData = new FormData();
+    formData.append("data", JSON.stringify({
+      seal_no: payload.seal_no,
+    }));
+
+    if (payload.foto_seal_finish) {
+      formData.append("files.foto_seal_finish", payload.foto_seal_finish);
+    }
+
+    const response = await httpClient.put(`/finishes/arrive/${shipmentId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return { success: true, data: response.data.data };
+  },
+
+  /**
    * Update Data Shipment SDJ. WAJIB menyertakan edit_reason.
    * @param {string|number} id
    * @param {object} edits - { ...fields, edit_reason: "..." }

@@ -194,6 +194,22 @@ export const useSdjStore = create((set, get) => ({
     }
   },
 
+  // Step 3: Arrive — DT sampai di lokasi tujuan
+  arriveItem: async (shipmentId, payload) => {
+    try {
+      const sanitized = {
+        seal_no: DOMPurify.sanitize(payload.seal_no || ""),
+        foto_seal_finish: payload.foto_seal_finish, // File object
+      };
+      await sdjService.arriveShipment(shipmentId, sanitized);
+      set({ _lastFetched: { overview: null, data: null, analytics: null } });
+      get().setActiveTab(get().activeTab);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.response?.data?.error?.message || error.message };
+    }
+  },
+
   updateItem: async (id, payload) => {
     try {
       const sanitizedPayload = { ...payload };
